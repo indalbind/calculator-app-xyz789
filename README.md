@@ -1,3 +1,2 @@
-# calculator-app-xyz789
-
-Generated application for calculator-app-xyz789
+bash
+    git clone https://github.com/indalbind/calculator-app-xyz789.git
