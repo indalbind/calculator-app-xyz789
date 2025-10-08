@@ -93,22 +93,28 @@
         <input type="text" id="display" value="0" readonly>
         <div class="calculator-buttons">
             <button class="btn btn-clear" id="clear">C</button>
+            <button class="btn btn-operator" data-operator="sqrt" id="sqrt">√</button>
+            <button class="btn btn-operator" data-operator="%" id="percent">%</button>
             <button class="btn btn-operator" data-operator="/" id="divide">/</button>
-            <button class="btn btn-operator" data-operator="*" id="multiply">x</button>
+
             <button class="btn btn-number" id="seven">7</button>
             <button class="btn btn-number" id="eight">8</button>
             <button class="btn btn-number" id="nine">9</button>
-            <button class="btn btn-operator" data-operator="-" id="subtract">-</button>
+            <button class="btn btn-operator" data-operator="*" id="multiply">x</button>
+
             <button class="btn btn-number" id="four">4</button>
             <button class="btn btn-number" id="five">5</button>
             <button class="btn btn-number" id="six">6</button>
-            <button class="btn btn-operator" data-operator="+" id="add">+</button>
+            <button class="btn btn-operator" data-operator="-" id="subtract">-</button>
+
             <button class="btn btn-number" id="one">1</button>
             <button class="btn btn-number" id="two">2</button>
             <button class="btn btn-number" id="three">3</button>
-            <button class="btn btn-equals" id="equals">=</button>
+            <button class="btn btn-operator" data-operator="+" id="add">+</button>
+
             <button class="btn btn-number" id="zero">0</button>
             <button class="btn btn-decimal" id="decimal">.</button>
+            <button class="btn btn-equals" id="equals">=</button>
         </div>
     </div>
 
@@ -132,7 +138,10 @@
         }
 
         function inputDigit(digit) {
-            if (waitingForSecondOperand) {
+            if (currentInput.includes('Error')) { // Clear error state on new digit
+                currentInput = digit;
+                waitingForSecondOperand = false;
+            } else if (waitingForSecondOperand) {
                 currentInput = digit;
                 waitingForSecondOperand = false;
             } else {
@@ -142,6 +151,12 @@
         }
 
         function inputDecimal(dot) {
+            if (currentInput.includes('Error')) { // Clear error state on new decimal
+                currentInput = '0.';
+                waitingForSecondOperand = false;
+                updateDisplay();
+                return;
+            }
             if (waitingForSecondOperand) {
                 currentInput = '0.';
                 waitingForSecondOperand = false;
@@ -155,6 +170,10 @@
         }
 
         function handleOperator(nextOperator) {
+            if (currentInput.includes('Error')) { // Do not proceed if in error state
+                return;
+            }
+
             const inputValue = parseFloat(currentInput);
 
             if (operator && waitingForSecondOperand) {
@@ -185,11 +204,61 @@
             updateDisplay();
         }
 
+        function calculateSquareRoot() {
+            if (currentInput.includes('Error')) {
+                return;
+            }
+            const inputValue = parseFloat(currentInput);
+            if (inputValue < 0) {
+                currentInput = 'Error';
+            } else {
+                currentInput = String(Math.sqrt(inputValue));
+            }
+            firstOperand = null; // Clear any pending operations
+            operator = null;
+            waitingForSecondOperand = false; // Ready for new input
+            updateDisplay();
+        }
+
+        function calculatePercentage() {
+            if (currentInput.includes('Error')) {
+                return;
+            }
+            let inputValue = parseFloat(currentInput);
+
+            if (firstOperand === null) {
+                // If no pending operation, X% means X / 100
+                currentInput = String(inputValue / 100);
+            } else {
+                let calculatedValueForOperator;
+                if (operator === '+' || operator === '-') {
+                    // For + and -, percentage means X +/- (X * Y/100)
+                    calculatedValueForOperator = (firstOperand * inputValue) / 100;
+                } else if (operator === '*' || operator === '/') {
+                    // For * and /, percentage means X * (Y/100) or X / (Y/100)
+                    calculatedValueForOperator = inputValue / 100;
+                } else {
+                    // Fallback for unknown operators, treat as X / 100
+                    currentInput = String(inputValue / 100);
+                    updateDisplay();
+                    return;
+                }
+
+                const result = performCalculation[operator](firstOperand, calculatedValueForOperator);
+                
+                currentInput = String(result);
+                firstOperand = result;
+                operator = null;
+                waitingForSecondOperand = true;
+            }
+            updateDisplay();
+        }
+
         const performCalculation = {
             '/': (firstOperand, secondOperand) => {
                 if (secondOperand === 0) {
                     currentInput = 'Error: Div by 0';
-                    return NaN;
+                    return NaN; // Return NaN to indicate error for consistency
                 }
                 return firstOperand / secondOperand;
             },
@@ -205,6 +274,16 @@
                 const { target } = event;
 
                 if (!target.matches('button')) {
+                    return;
+                }
+
+                if (target.dataset.operator === 'sqrt') {
+                    calculateSquareRoot();
+                    return;
+                }
+
+                if (target.dataset.operator === '%') {
+                    calculatePercentage();
                     return;
                 }
 
